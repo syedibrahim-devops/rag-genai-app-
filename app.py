@@ -46,7 +46,12 @@ def initialize_rag_pipeline():
     Raises:
         SystemExit: If API key is not found
     """
-    api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+    try:
+        # Try to get API key from secrets
+        api_key = st.secrets.get("GEMINI_API_KEY")
+    except Exception as e:
+        # If secrets don't exist or can't be accessed, try environment variable
+        api_key = os.getenv("GEMINI_API_KEY")
     
     if not api_key:
         st.error("""
@@ -55,10 +60,19 @@ def initialize_rag_pipeline():
         Please set your API key:
         - **Local Development**: Create `.streamlit/secrets.toml` with `GEMINI_API_KEY`
         - **Streamlit Cloud**: Add secret in app settings
+        
+        **Current Status:**
+        - Secrets accessible: Check logs for details
+        - Environment variable: Not set
         """)
         st.stop()
     
-    return RAGPipeline(api_key=api_key)
+    try:
+        return RAGPipeline(api_key=api_key)
+    except Exception as e:
+        st.error(f"Failed to initialize RAG pipeline: {str(e)}")
+        st.exception(e)
+        st.stop()
 
 # ============================================================================
 # MAIN APPLICATION
@@ -83,6 +97,7 @@ def main():
         rag_pipeline = initialize_rag_pipeline()
     except Exception as e:
         st.error(f"Failed to initialize RAG pipeline: {str(e)}")
+        st.exception(e)
         st.stop()
     
     # Sidebar settings
@@ -271,4 +286,22 @@ def display_results(answer: str, relevant_chunks: List[Tuple[str, float]]):
 # ============================================================================
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # Display error to user
+        st.error("❌ **Application Error**")
+        st.error(f"An error occurred: {str(e)}")
+        st.exception(e)
+        
+        # Helpful debugging info
+        st.markdown("---")
+        st.markdown("### 🔧 Troubleshooting")
+        st.markdown("""
+        1. **Check API Key**: Ensure `GEMINI_API_KEY` is set in Streamlit Cloud secrets
+        2. **Check Files**: Verify all files in `utils/` folder exist
+        3. **Check Logs**: View detailed logs in Streamlit Cloud dashboard
+        """)
+        
+        # Re-raise to show in logs
+        raise
